@@ -28,9 +28,9 @@ class Migration
         self::execute();
     }
 
-    public static function integer($columnName, $length = 20)
+    public static function integer($columnName, $length = 11)
     {
-        return self::addColumn($columnName, 'BIGINT', $length);
+        return self::addColumn($columnName, 'INT', $length);
     }
 
     public static function bigInt($columnName, $length = 20)
@@ -55,7 +55,7 @@ class Migration
 
     public static function id($columnName = 'id')
     {
-        return self::addColumn($columnName, 'INT', 11)->primaryKey()->autoIncrement();
+        return self::addColumn($columnName, 'INT', 11)->autoIncrement();
     }
 
     public static function date($columnName)
@@ -91,7 +91,13 @@ class Migration
         return self::addColumn($columnName, 'UUID');
     }
 
-    public static function foreign($columnName)
+    public static function unique()
+    {
+        self::$columns[count(self::$columns) - 1]['unique'] = true;
+        return new self();
+    }
+
+    public static function foreignKey($columnName)
     {
         self::$columns[count(self::$columns) - 1]['foreign'] = $columnName;
         return new self();
@@ -138,6 +144,35 @@ class Migration
         return new self();
     }
 
+    public static function default($value)
+    {
+        self::$columns[count(self::$columns) - 1]['default'] = $value;
+        return new self();
+    }
+
+    public static function foreign($columnName, $referencesTable, $referencesColumn = 'id')
+    {
+        // Initialize foreign key array if it doesn't exist
+        if (!isset(self::$columns[count(self::$columns) - 1]['foreign'])) {
+            self::$columns[count(self::$columns) - 1]['foreign'] = [];
+        }
+
+        // Add the foreign key to the array
+        self::$columns[count(self::$columns) - 1]['foreign'][] = [
+            'columnName' => $columnName,
+            'referencesTable' => $referencesTable,
+            'referencesColumn' => $referencesColumn
+        ];
+
+        return new self();
+    }
+
+    public static function enum($columnName, array $values)
+    {
+        $valuesString = "'" . implode("', '", $values) . "'";
+        return self::addColumn($columnName, "ENUM({$valuesString})");
+    }
+
     public static function execute()
     {
         $sql = "CREATE TABLE IF NOT EXISTS `" . self::$tableName . "` (";
@@ -152,22 +187,36 @@ class Migration
             if (isset($column['primaryKey']) && $column['primaryKey']) {
                 $sql .= " PRIMARY KEY";
             }
+            if (isset($column['unique']) && $column['unique']) {
+                $sql .= " UNIQUE";
+            }
             if (isset($column['nullable']) && $column['nullable']) {
                 $sql .= " NULL";
             } else {
                 $sql .= " NOT NULL";
             }
+            if (isset($column['default'])) {
+                $sql .= " DEFAULT '" . $column['default'] . "'";
+            }
             if (isset($column['foreign'])) {
-                $sql .= ", FOREIGN KEY (`{$column['columnName']}`) REFERENCES {$column['references']}";
+                $foreign = $column['foreign'];
+                foreach ($foreign as $foreignKey) {
+                    $sql .= ", FOREIGN KEY (`{$foreignKey['columnName']}`) REFERENCES `{$foreignKey['referencesTable']}`(`{$foreignKey['referencesColumn']}`)";
+                }
             }
             if (isset($column['uuid'])) {
                 $sql .= " DEFAULT UUID()";
+            }
+            if (isset($column['enum'])) {
+                $valuesString = "'" . implode("', '", $column['enum']) . "'";
+                $sql .= ", ENUM({$valuesString})";
             }
             $sql .= ",";
         }
         $sql = rtrim($sql, ',');
         $sql .= ");";
 
+        // echo ($sql);
         // Execute the SQL query to create the table using the PDO connection
         self::$pdo->exec($sql);
 
@@ -225,19 +274,23 @@ class Migration
     public static function dropAll()
     {
         self::init();
-        // Get all table names from the database
-        $query = "SHOW TABLES";
-        $stmt = self::$pdo->query($query);  // Use self::$pdo to execute the query
-        $tables = $stmt->fetchAll(\PDO::FETCH_COLUMN);
 
-        // Create DROP TABLE query for each table
+        $tables = self::$pdo->query("SELECT migration FROM migrations ORDER BY id DESC")->fetchAll(\PDO::FETCH_COLUMN);
+
+        // Create DROP TABLE query for each remaining table except migrations
         foreach ($tables as $table) {
-            $dropQuery = "DROP TABLE IF EXISTS `$table`";
-            self::$pdo->exec($dropQuery);
+            if ($table !== 'migrations') {
+                $dropQuery = "DROP TABLE IF EXISTS `$table`";
+                self::$pdo->exec($dropQuery);
+            }
         }
 
-        echo "All tables were deleted successfully." . PHP_EOL;
+        // Delete all records from the migrations table
+        self::$pdo->exec("TRUNCATE TABLE migrations");
+
+        echo "All tables except migrations were deleted successfully, and migrations table was reset." . PHP_EOL;
     }
+
 }
 
 // Make sure to call init method at the beginning of the script
