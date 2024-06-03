@@ -54,33 +54,54 @@ class Route
 
     public static function dispatch($method, $path)
     {
+        $handler = null;
+    
+        // Pisahkan jalur dan parameter (jika ada)
+        $pathParts = explode('?', $path);
+        $pathWithoutParams = $pathParts[0]; // Ambil jalur tanpa parameter
+    
+        // Cari rute yang sesuai dengan metode dan jalur tanpa parameter yang diberikan
         foreach (self::$routes as $route) {
-            if ($route['method'] === $method && $route['path'] === $path) {
+            $routeParts = explode('?', $route['path']);
+            $routePathWithoutParams = $routeParts[0]; // Ambil jalur rute tanpa parameter
+            if ($route['method'] === $method && $routePathWithoutParams === $pathWithoutParams) {
                 $handler = $route['handler'];
-
-                // Jalankan middleware sebelum mengeksekusi handler
-                foreach (self::$middleware as $middleware) {
-                    $middlewareClass = new $middleware();
-                    $handler = $middlewareClass->handle($handler);
-                }
-
-                if (is_array($handler) && count($handler) == 2 && is_string($handler[0]) && is_string($handler[1])) {
-                    // Buat instance dari kelas controller dan panggil method-nya secara dinamis
-                    $class = $handler[0];
-                    $method = $handler[1];
-                    $controller = new $class();
-                    return call_user_func_array([$controller, $method], []);
-                } elseif (is_callable($handler)) {
-                    // Panggil handler jika callable
-                    return $handler();
-                }
-
-                // Jika handler bukan dalam format yang diharapkan, tanggapi dengan 500 Internal Server Error
-                MsgPage("Handler format is invalid: " . print_r($handler, true));
+                break;
             }
         }
+    
+        // Jika handler tidak ditemukan, tanggapi dengan 404 Not Found
+        if ($handler === null) {
+            http_response_code(404);
+            echo "404 Not Found";
+            exit;
+        }
+    
+        // Jalankan middleware sebelum mengeksekusi handler
+        foreach (self::$middleware as $middleware) {
+            $middlewareClass = new $middleware();
+            $handler = $middlewareClass->handle($handler);
+        }
+    
+        // Buat objek Request
+        $request = new Request();
+    
+        // Cek apakah handler dalam format yang diharapkan
+        if (is_array($handler) && count($handler) == 2 && is_string($handler[0]) && is_string($handler[1])) {
+            // Buat instance dari kelas controller dan panggil method-nya secara dinamis
+            $class = $handler[0];
+            $method = $handler[1];
+            $controller = new $class();
+            return call_user_func_array([$controller, $method], [$request]);
+        } elseif (is_callable($handler)) {
+            // Panggil handler jika callable
+            return $handler($request);
+        }
+    
+        // Jika handler tidak sesuai dengan format yang diharapkan, tanggapi dengan 500 Internal Server Error
+        http_response_code(500);
+        echo "500 Internal Server Error";
+        exit;
+    }    
 
-        // Jika tidak ada rute yang cocok, tanggapi dengan 404 Not Found
-        MsgPage("Handler format is invalid: " . print_r($handler, true));
-    }
 }
