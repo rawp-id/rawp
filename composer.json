@@ -1,0 +1,21 @@
+{
+    "name": "rawp/rawp",
+    "description": "A custom PHP framework with microservice architecture",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Core\\": "src/Core/",
+            "CLI\\": "src/CLI/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Rifky Aryo",
+            "email": "wpipit35@gmail.com"
+        }
+    ],
+    "require": {
+        "phpmailer/phpmailer": "^6.9"
+    }
+}

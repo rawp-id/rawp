@@ -1,0 +1,24 @@
+#!/usr/bin/env php
+<?php
+
+// Get the directory of the current script
+$dir = __DIR__;
+
+// Path to the bin/console script
+$consolePath = $dir . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'console';
+
+// Ensure the console script exists
+if (!file_exists($consolePath)) {
+    echo "The console script does not exist.\n";
+    exit(1);
+}
+
+// Execute the console script with any passed arguments using PHP
+$args = array_slice($argv, 1);
+$command = escapeshellcmd(PHP_BINARY) . ' ' . escapeshellarg($consolePath) . ' ' . implode(' ', array_map('escapeshellarg', $args));
+
+// Execute the command
+passthru($command, $exitCode);
+
+// Exit with the same code as the console script
+exit($exitCode);

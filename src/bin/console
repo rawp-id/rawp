@@ -1,0 +1,45 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/../../autoload.php';
+
+use CLI\CreateControllerCommand;
+use CLI\CreateModelCommand;
+use CLI\DropTableCommand;
+use CLI\MigrateRefreshCommand;
+use CLI\MigrateResetCommand;
+use CLI\MigrateRunCommand;
+use CLI\MigrateRunListCommand;
+use CLI\ServeCommand;
+
+$commands = [
+    'create:controller' => CreateControllerCommand::class,
+    'create:model' => CreateModelCommand::class,
+    'migrate:run' => MigrateRunCommand::class,
+    'migrate:list' => MigrateRunListCommand::class,
+    'migrate:reset' => MigrateResetCommand::class,
+    'migrate:refresh' => MigrateRefreshCommand::class,
+    'migrate:drop' => DropTableCommand::class,
+    'serve' => ServeCommand::class,
+];
+
+$args = $argv;
+array_shift($args);
+
+$commandName = array_shift($args);
+
+// If the command name is not provided or it's 'list' or '-h', show the list of commands
+if (!$commandName || $commandName === 'list' || $commandName === '-h') {
+    echo "Available commands:\n";
+    foreach ($commands as $name => $className) {
+        echo "- $name\n";
+    }
+    exit;
+}
+
+if (isset($commands[$commandName])) {
+    $command = new $commands[$commandName]();
+    $command->execute($args);
+} else {
+    echo "Command not found.\n";
+}
